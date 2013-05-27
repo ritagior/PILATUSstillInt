@@ -24,6 +24,7 @@ from optparse import OptionParser
 
 # Options to run the code from command line.
 
+
 parser = OptionParser()
 
 parser.add_option("-i", "--image", dest="image",
@@ -56,7 +57,7 @@ print 'The output CSV file name is %s' % (options.csv_output,)
 if options.verbose:
     print "I should be more talktative."
 
-
+# rpy2 and numpy library
 import rpy2
 import numpy as np
 import rpy2.robjects as robjects
@@ -64,42 +65,31 @@ from rpy2.robjects.packages import importr
 import sys
 from rpy2.robjects.numpy2ri import numpy2ri
 rpy2.robjects.numpy2ri.activate()
-#import rpy2.robjects.numpy2ri
-#import rpy2.robjects.lib.ggplot2 as ggplot2
-#import math, datetime
-#from rpy2.robjects import IntVector, Formula
-#from rpy2.robjects import Environment
-#import rpy2.rinterface
 import time
-#import csv
-from Function import *
-
+from Function import *  # this line woll import the function defined in the file Function.py
 
 
 r=robjects.r
 
 # Import DISP package to read the cbf images and the other R packages.
 disp = importr('DISP')
-#grdevices = importr('grDevices')
-#reshape = importr('reshape2')    ### for the function melt
-#stats = importr('stats')
 base = importr('base')
 utilis = importr('utils')
 graphics = importr('graphics')
 grDev = importr('grDevices')
 
 
-# Read a CBF images using DISP function readCBF, transpose the matrix and transform to a NUMPY array.
-dty = robjects.r('readCBF("'+options.image+'")')
-dty_t=dty.transpose()
+# Read a CBF images using DISP function readCBF, transpose the matrix and transform to a NUMPY array. The transposition is needed to have a matrix in the same orientation of Albula.
+dty = robjects.r('readCBF("'+options.image+'")').transpose()
+#dty_t=dty.transpose()
 a = np.array(dty_t)
 
-# Calculate the dimension of the matrix, in this case the code will
+# Calculate the dimension of the matrix, this case the code will automatic recognise the pixel dimension of the detector
 dimCBF = base.dim(dty)
 x = dimCBF[0]
 y = dimCBF[1]
 
-# Define the initial coordinate of the measurement box, starting for the top left corner of the image.
+# Define the initial coordinate of the measurement box, starting for the top left corner of the image. The measurement box dimension is 15 x 15.
 X0i=0
 X0f=15
 Y0i=0
@@ -115,17 +105,17 @@ append1 = position_peak.append
 coorappend = position_measurement_box.append
 t=time.time()
 
-## Select the measurement box. This loop will start for the measurement box with coordinates[Y0i:Y0f,X0i:X0f], it will read each pixel of the detector imahes and will find the good measurement box containing the spot. The criterias for the spot selection are: 1) the sum of the pixels in measurement box, definded as 'stat[0]', > 5000 counts; 2) The maximum value on the matrix mb > 500 and 3) the peak should lie in the center of the measurement box.
+## Select the measurement box. The following for loop will start from the measurement box with coordinates[Y0i:Y0f,X0i:X0f], it will read each pixel of the detector images and will find the good measurement box containing the spot. The criterias for the spot selection are: 1) the sum of the pixels in measurement box, definded as stat[0]; 2) The maximum value on the measurement box matrix, stat[1], which correspond to the max peak; 3) the max peak should lie in the center of the measurement box, definded using th funtion argmax().
 
-print " This calculation will takes about 5 minutes, you have the time for a coffee :) "
+print " This calculation will takes about 2 minutes, you have the time for a short coffee :) "
 
 for i in xrange(0,x):
     for j in xrange(0,y):
-        m=a[Y0i+j:Y0f+j,X0i+i:X0f+i]
-        stat = matCal(m)
-        Yc=((Y0i+j)+(Y0f+j))/2
+        m=a[Y0i+j:Y0f+j,X0i+i:X0f+i]     # measurement box
+        stat = matCal(m)                 # see definition in Function.py
+        Yc=((Y0i+j)+(Y0f+j))/2           # peak coordinates
         Xc=((X0i+i)+(X0f+i))/2
-        Y=[Y0i+j,Y0f+j]
+        Y=[Y0i+j,Y0f+j]                  # measurement box coordinates
         X=[X0i+i,X0f+i]
         if (stat[0]>options.peak and stat[1]> options.min_pixel_count and
             m.argmax()== centerPosition):
@@ -141,13 +131,12 @@ max_peak = []
 for h in measurement_box:
     max_peak.append(h.max())
 
-# Define the parameter to be write in the output file.
+# Define the parameter to be write in the output file and convert in a numpy array.
 max_peak_Array = np.array(max_peak)
 pos_peak_Array = np.array(position_peak)
 pos_measurement_box_Array = np.array(position_measurement_box)
 
-# Convert the numpy array to rpy objects.
-
+# Convert the numpy array to an rpy objects.
 max_peak_R = robjects.conversion.py2ri(max_peak_Array)
 pos_peak_R = robjects.conversion.py2ri(pos_peak_Array)
 pos_measurement_box_R = robjects.conversion.py2ri(pos_measurement_box_Array)
@@ -155,10 +144,14 @@ pos_measurement_box_R = robjects.conversion.py2ri(pos_measurement_box_Array)
 ### Create a data frame with the maximum peak, the position of the peak and the measurement box of the spot.
 dataf = {'Peak': max_peak_R, 'Coor': pos_peak_R, 'MeasB': pos_measurement_box_R}
 dataframe = robjects.DataFrame(dataf)
-
+# use the R function write.csv() to create the csv file containing the dataframe.
+# In the csv file : Coor.1 = X coordinates of the peak
+# Coor.2 = Y coordinates of the peak
+# Peak = counts of the peak
+# MeasB = coordinates of measurement box which will be used from ReadingSpot.py
 utilis.write_csv(dataframe, options.csv_output)
 
-# Using DISP package display the post found previously
+# Open the funtion zoom and spot identify.
 
 f=file("/Users/giordano_r/Desktop/Rscript/zoomDisp.R")
 code=''.join(f.readlines())
@@ -166,6 +159,7 @@ result = robjects.r(code)
 zoom = rpy2.robjects.globalenv['zoom']
 ident = rpy2.robjects.globalenv['ident']
 
+# Display the cbf images with the selected spot. It possible to click on the spt to see a zoom of it and the spot profile. 
 grDev.X11()
 graphics.par(mfrow=[2,2])
 disp.disp(dty)
