@@ -58,6 +58,10 @@ parser.add_option("-q", "--quiet",
 
 (options, args) = parser.parse_args()
 
+if options.images is None or options.csv_output is None:
+    parser.print_help()
+    parser.error('All options are mandatory.')
+
 print options
 
 print 'The input CBF file name is %s' % (options.images,)
@@ -74,6 +78,7 @@ disp = importr('DISP')
 grdevices = importr('grDevices')
 reshape = importr('reshape2')    ### for the function melt
 utilis = importr('utils')
+base = importr('base')
 
 ## Read the spot position and the coordinates of the measurement box for each spot previously founded
 ## using only the first images.
@@ -92,35 +97,51 @@ Ybox = zip(Yi,Yf)
 ## Create a tuple with coordinates of the measurement box.
 Measbox = zip(Yi, Yf, Xi, Xf)
 
+
+file1=options.images.replace('?','00001')
+print file1
+dty1=robjects.r('readCBF("'+file1+'")')
+attribute = base.attr(dty1,"metadata")
+detectorOffset = np.array(attribute[7])
+beamY = np.array(attribute[9])
+header_still = utilis.read_table("header_still.dat")
+detectorOffset_still1 = header_still.rx(1,1)
+beamY_still1 = header_still.rx(1,2)
+
+d=1
+if ( detectorOffset == detectorOffset_still1 ):
+    d = 0
+    print "No detector offset"
+else:
+    d = beamY - beamY_still1
+    print 'The detector offset is %.1f:' % d
+
+
 ## Define the path where are the files.
 ## Open the images.
 
 I = []
-sigma = []
 PeakI = []
 t=time.time()
 for i in range(1,options.num_frames+1):
     filename=options.images.replace('?','%05d' % i)
     dty = robjects.r('readCBF("'+filename+'")').transpose()
+    attribute = base.attr(dty,"metadata")
     a = np.array(dty)
     NewboxI = []
-    NewboxS = []
     NewboxIpeak = []
     for item in Measbox:
-        box = a[item[0]:item[1],item[2]:item[3]]
+        box = a[item[0]+d:item[1]+d,item[2]:item[3]]
         m=matCal(box)
         NewboxI.append(m[0])
-        NewboxS.append(m[2])
         NewboxIpeak.append(m[1])
     I.append(NewboxI)
-    sigma.append(NewboxS)
     PeakI.append(NewboxIpeak)
 print "run time: %.3f s" % (time.time()-t)
 Iarray = np.array(I)
 
 ### Create a data frame with 
 
-#ofile = open(options.csv_output, 'wb')
 ofile = open('temp.csv','wb')
 writer = csv.writer(ofile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
 header = ['XP', 'YP']
@@ -139,7 +160,6 @@ for idx,j in enumerate(Iarray[0]):
 ofile.close()
 
 # Read the intensity file and calculated the cv for each spot in the file.
-#dataf = robjects.DataFrame.from_csvfile(options.csv_output)
 dataf = robjects.DataFrame.from_csvfile('temp.csv')
 number_of_peaks = len(dataf[0])
 print number_of_peaks
@@ -170,7 +190,9 @@ pp.plot()
 print "Close plot: Return"
 raw_input()
 
-
+grdevices.pdf('cv_still.pdf')
+pp.plot()
+grdevices.dev_off()
 
 
 
