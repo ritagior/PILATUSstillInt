@@ -32,7 +32,7 @@ def rmsd_r(f1,f2,n):
 
 
 # Function to calculate the distance in pixel of the spot from the beam center.
-def distPx(Xspot,beamX,Yspot,beamY):
+def distPx(Xspot,Xbeam,Yspot,Ybeam):
     distPx = np.sqrt(np.square(Xspot-Xbeam)+np.square(Yspot-Ybeam))
 
 # Distance on the detector from the direct beam.
