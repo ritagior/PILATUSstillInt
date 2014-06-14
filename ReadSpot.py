@@ -38,7 +38,9 @@ from Function import *
 from optparse import OptionParser
 
 
-parser = OptionParser()
+#parser = OptionParser()
+
+parser = OptionParser(usage="%prog --images=<cbf filename>  --csv-input=<input filename>, --csv-output=<output filename>, --num-frames=<number of frames>")
 
 parser.add_option("-i", "--images", dest="images",
                   help="All CBF images from a still measurement; replace image index number with the quotation character '?' for example: liso_1_?.cbf")
@@ -47,7 +49,7 @@ parser.add_option("--csv-input", dest="csv_input",
                   help="The filename for the input in CSV coming from FindingSpots.py")
 
 parser.add_option("--csv-output", dest="csv_output",
-                  help="The filename for the output CSV .....")
+                  help="The filename for the output CSV containing the intensty for each frames and each spot")
 
 parser.add_option("--num-frames", dest="num_frames", type="int",
                   help="The number of frames to analyze.")
@@ -80,12 +82,17 @@ reshape = importr('reshape2')    ### for the function melt
 utilis = importr('utils')
 base = importr('base')
 
+# Read data collection parameters. This parameters are read directly from the PILATUS Diffraction images.
+param=utilis.read_table("header_still.dat")
+
+
+
 ## Read the spot position and the coordinates of the measurement box for each spot previously founded
 ## using only the first images.
 
-data=utilis.read_csv(options.csv_input)#data1=data.replace('dataSpot.csv',sys.argv[1])
-Xp = data.rx2(2)
-Yp = data.rx2(3)
+data=utilis.read_csv(options.csv_input) #data1=data.replace('dataSpot.csv',sys.argv[1])
+Xspot = data.rx2(2)
+Yspot = data.rx2(3)
 Peak = data.rx2(4)
 Yi = data.rx2(5)
 Xi = data.rx2(6)
@@ -98,24 +105,28 @@ Ybox = zip(Yi,Yf)
 Measbox = zip(Yi, Yf, Xi, Xf)
 
 
-file1=options.images.replace('?','00001')
-print file1
-dty1=robjects.r('readCBF("'+file1+'")')
-attribute = base.attr(dty1,"metadata")
-detectorOffset = np.array(attribute[7])
-beamY = np.array(attribute[9])
-header_still = utilis.read_table("header_still.dat")
-detectorOffset_still1 = header_still.rx(1,1)
-beamY_still1 = header_still.rx(1,2)
+#--------- This part of code is to be used for vertical offset of the detector ---------------#
 
-d=1
-if ( detectorOffset == detectorOffset_still1 ):
-    d = 0
-    print "No detector offset"
-else:
-    d = beamY - beamY_still1
-    print 'The detector offset is %.1f:' % d
+#file1=options.images.replace('?','00001')
+#print file1
+#dty1=robjects.r('readCBF("'+file1+'")')
+#attribute = base.attr(dty1,"metadata")
+#detectorOffset = np.array(attribute[7])
+#beamY = np.array(attribute[9])
+#header_still = utilis.read_table("header_still.dat")
+#detectorOffset_still1 = header_still.rx(1,1)
+#beamY_still1 = header_still.rx(1,2)
 
+#d=1
+#if ( detectorOffset == detectorOffset_still1 ):
+#    d = 0
+#    print "No detector offset"
+#else:
+#    d = base.round(beamY - beamY_still1)
+#    offset = np.array(d)
+#    print 'The detector offset is :', d.rx(1)
+
+#-------------------------------- END -------------------------------------------------------#
 
 ## Define the path where are the files.
 ## Open the images.
@@ -131,7 +142,7 @@ for i in range(1,options.num_frames+1):
     NewboxI = []
     NewboxIpeak = []
     for item in Measbox:
-        box = a[item[0]+d:item[1]+d,item[2]:item[3]]
+        #box = a[item[0]+offset[0]:item[1]+offset[0],item[2]:item[3]]  this line will be used for offset detector
         m=matCal(box)
         NewboxI.append(m[0])
         NewboxIpeak.append(m[1])
@@ -177,6 +188,12 @@ dtf_cv = robjects.r.melt(dataf_cv)
 d=dataf.cbind(dtf_cv.rx(2))
 d.names[tuple(d.colnames).index('value')] = 'CV'
 utilis.write_csv(d, options.csv_output)
+
+## Calculate the resolution bin for each spot.
+
+# Function to calculate the distance in pixel of the spot from the beam center.
+for i in range(1,number_of_peaks+1):
+    distPx(Xspot,Xbeam,Yspot,Ybeam)
 
 
 # Plot the cv of reflection for all images using ggplot2:# http://had.co.nz/ggplot2/

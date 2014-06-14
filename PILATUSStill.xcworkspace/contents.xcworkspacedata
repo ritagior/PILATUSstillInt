@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:DispCBF.py">
+   </FileRef>
+   <FileRef
+      location = "group:FindingSpot.py">
+   </FileRef>
+   <FileRef
+      location = "group:ReadSpot.py">
+   </FileRef>
+   <FileRef
+      location = "group:Function.py">
+   </FileRef>
+   <FileRef
+      location = "group:README.TXT">
+   </FileRef>
+   <FileRef
+      location = "group:PlotIntensity.py">
+   </FileRef>
+   <FileRef
+      location = "group:test.py">
+   </FileRef>
+</Workspace>

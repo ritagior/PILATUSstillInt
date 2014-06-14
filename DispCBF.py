@@ -18,13 +18,15 @@ from optparse import OptionParser
 
 # Options to run the code from command line.
 
-parser = OptionParser()
+#parser = OptionParser()
+
+parser = OptionParser(usage="%prog --image=<cbf filename> --csv-input=<input filename>")
 
 parser.add_option("-i", "--image", dest="image",
                   help="A CBF image from a still measurement.")
 
 parser.add_option("--csv-input", dest="csv_input",
-                  help="The filename for the output in CSV format.")
+                  help="The filename for the input in CSV format, coming from FindingSpot.py.")
 
 parser.add_option("-q", "--quiet",
                   action="store_false", dest="verbose", default=True,
@@ -58,13 +60,14 @@ graphics = importr('graphics')
 grDev = importr('grDevices')
 
 # Read R script to zoom on the spot. This function will also show the spot profile. 
-f=file("/Users/giordano_r/Desktop/Rscript/zoomDisp.R")
+#f=file("/Users/giordano_r/Desktop/Rscript/zoomDisp.R")
+f=file("zoomDisp.R")
 code=''.join(f.readlines())
 result = robjects.r(code)
 zoom = rpy2.robjects.globalenv['zoom']
 ident = rpy2.robjects.globalenv['ident']
 
-# Display the cbf images with ths spot 
+# Display the cbf images with ths spot to have an interactive window to check each spot and display the spot profile for x and y axis.
 dty = robjects.r('readCBF("'+options.image+'")')
 data=utilis.read_csv(options.csv_input)
 x = data.rx2(2)
